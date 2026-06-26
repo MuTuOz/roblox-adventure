@@ -1,0 +1,70 @@
+---
+name: project-forest-boss-build
+description: "[REMOVED 2026-06-24] Forest boss 'Verdant Warden' was deleted from the biome. Doc kept as a build pattern for future shared-ARENA bosses (e.g. Tung Tung Sahur)."
+metadata:
+  node_type: memory
+  type: project
+  originSessionId: forest-boss-session
+---
+
+# Forest Boss — "The Verdant Warden"
+
+> **STATUS: REMOVED 2026-06-24.** Per design pivot — biomes become per-player instanced (solo farming) and ALL boss fights move to the shared hub Arena (Tung Tung Sahur planned as the rebirth-10 arena boss). Deleted: `Workspace.VerdantWarden`, `Workspace.ForestBiome.BossArena` (incl. its summon altar + the "warden monument"), `ServerScriptService.ForestBoss`. The rebirth 9→10 boss gate was REMOVED PERMANENTLY (ProfileService.CanRebirth no longer checks bossDefeated). Now-DORMANT (not yet cleaned up): base-yard Warden trophy busts stay "No trophy yet" forever, and TrophyIncome can never accrue (nothing sets bossTrophy) — candidates to remove or re-tie to the future arena boss. GameData.Boss* + ForestConfig.BOSS constants + Profile boss fields/functions still exist but are unused (harmless). The build details below are kept as the reusable pattern for the new shared-arena boss.
+
+## Original build (as of 2026-06-23, now removed)
+
+The Biome-1 boss for the [[project-game-concept]] MMORPG, capping the [[project-forest-biome-build]] Forest. Gates rebirth progression and feeds the base trophy system ([[project-town-hub-build]] / [[project-rebirth-shop-build]]). Built in place "v1". Reuses the [[project-combat-inventory-build]] combat conventions.
+
+## Design (per user choices)
+- **Sealed boss arena** past a 5th graded path from the glade (not in the glade).
+- **Summon altar** with a ProximityPrompt — boss is DORMANT (sunken below arena) until summoned, then rises.
+- Rewards: **gates rebirth progression** (must beat boss to cross the biome boundary) + **drops a base trophy** (lights up the base TrophyDisplay — passive-income hook).
+
+## Location & terrain
+- Arena center **(-3520, 0, -610)**, radius 92; due-north (-Z) of the glade on the X-centerline. 642 studs from forest center (-3500,0,0), inside valley R=820. ~470 from BLUE/RED camps.
+- Summon altar at **(-3500, 0, -150)** (just past glade edge); boss stands at **(-3520, 7, -610)**.
+- Terrain was **graded flat to y≈1.5** for the arena pad + a path corridor (FillRegion grass below + clear air column above to remove hills). 140 flora parts/models cleared from the pad+path (forest rule: roads/clearings never cross hills/objects). Path centerline x=-3550 was naturally flat; arena pad needed grading on its west edge (mountain ring).
+- 5th path: ~46 ground-colored (132,112,82) 13x0.5x14 flat tiles in `Workspace.ForestBiome.Decor.Paths` (tagged `BossPath`), double-wide, ground-snapped.
+
+## Config (single source of truth)
+- `ReplicatedStorage.ForestConfig.BOSS` table: id=VerdantWarden, name, arena/arenaR/altar/bossSpawn/pathFromZ coords, **Health=2600, AttackPower=34, Armor=8, Level=10**, SlamRange=16/SlamDamage=40/SlamInterval=5.5, MeleeRange=11/MeleeDamage=22/MeleeInterval=2.2, color/glow.
+- `ReplicatedStorage.GameData`: **BossGoldReward=2500, BossCrystalReward=5 (of EACH crystal), BossId, BossRespawnTime=45, ForestBossGateLevel=9** (can't rebirth 9->10 without the boss).
+- NOTE: ForestConfig is cached on first `require`; after editing BOSS, MCP `execute_luau` in Edit must `(loadstring(ForestConfig.Source))()` to read fresh (require gives stale). `loadstring` is NOT available in Client/Server datamodels — hardcode coords there.
+
+## Boss model: `Workspace.VerdantWarden` (tagged `ForestBoss`)
+- Big mossy slime-golem king (~35 parts): translucent green gel body (PrimaryPart = HumanoidRootPart, 16-ball), glowing Neon crystal core + PointLight, stone armor plates, 2 stubby gel arms with stone fists+knuckles, cracked stone crown (spikes + gold band + gem), glowing eyes+brow, ambient sparkles. Attributes: MaxHealth/Health/AttackPower/Armor/Level/Alive/Awake/HomePos.
+- Dormant = pivoted to bossSpawn + (0,-40,0) (sunken). Awake = raised, faces nearest player (yaw), idle bob.
+
+## Arena: `Workspace.ForestBiome.BossArena`
+- Layered stone floor discs + mossy duel medallion + faint Neon rune ring; 10 broken pillars (some toppled) with moss bases ringing the rim; ancient stone throne backdrop at -Z with overgrown vines + 2 green-flame braziers (Fire+PointLight). `SummonAltar` submodel: stepped dais, pedestal, floating Neon summon crystal (+light+sparkles), 2 rune pillars, title billboard, `SummonPrompt` ProximityPrompt (E, 1.2s hold).
+
+## Scripts
+- `ServerScriptService.ForestBoss` (Script): summon flow (prompt.Triggered -> awaken: rise tween, enable big BossBar, BossEvent broadcast), damage via **shared MobHit remote filtered to `target==boss`** (separate handler from ForestMobs; both filter by tag), telegraphed **AoE slam** (expanding red ring warning, 0.9s windup, radial damage) + **melee**, per-player 0.45-0.5s i-frames + block reduction (reuses GameData.BlockReduction). Death: last-damager gets full rewards + trophy drop; assists get 50% gold; sets profile flag; BossEvent "defeated"; resets dormant after 4s.
+- `ServerStorage.Weapons.*.ClientAttack` (all 4 weapons): `slimeFrom`->`targetFrom` now also matches `ForestBoss` tag; nearest-target loop includes ForestBoss-tagged. So any weapon can hit the boss via the existing MobHit path.
+- `ServerScriptService.ProfileService`: added `bossDefeated`+`bossTrophy` (persisted, synced), `SetBossDefeated/SetBossTrophy/GetBossDefeated/GetBossTrophy`. **CanRebirth gate**: if rebirth level >= ForestBossGateLevel(9) and not bossDefeated -> blocked ("Defeat the Verdant Warden first!").
+- `ServerScriptService.BaseRegistry`: `SetBaseTrophy(base, active)` — active reveals the FULL Warden figure (glowing green Neon body + PointLight) + "Forest Warden" label; inactive HIDES the whole figure (empty pedestal) + "No trophy yet" hint. The trophy is a multi-part sculpture, not one part: TROPHY_PARTS = {BossTrophy_ForestWarden, Snout, EyeL, EyeR, HornL, HornR} (siblings in the Yard; Plinth/PlinthCap/Dome/TrophyTagAnchor always stay). Free() also resets trophy. IMPORTANT: hide/show ALL TROPHY_PARTS — hiding only the body left floating eyes/snout/horns (fixed 2026-06-23). All 8 bases ship in the empty/hidden state at edit-time.
+- `ServerScriptService.BaseOwnership`: on assign, also restores trophy state from `Profile.GetBossTrophy`.
+- `StarterPlayerScripts.ForestInventoryUI`: added center-top `announce()` banner for `Remotes.BossEvent` (summoned/defeated).
+- Remotes added: `BossEvent` (RemoteEvent, server->clients announce).
+
+## Base trophy location (discovered)
+- The Forest Warden trophy is in the **Yard**, not a TrophyDisplay child: `Base_i.Yard.BossTrophy_ForestWarden` (2.8 ball), `Yard.Dome` (glass), `Yard.TrophyTagAnchor`, `Yard.TrophyPlate`. Inactive = grey Slate; activated = green Neon + TrophyGlow PointLight.
+
+## Verified in playtest (2026-06-23)
+- Summon via real altar prompt -> boss awakens, rises, BossBar "The Verdant Warden" enabled.
+- Killed with Crystal Scepter (atk 60): HP 2600->0.
+- Rewards: +2500 gold, +5 of each crystal, bossDefeated=true (+attr ForestBossDefeated), trophy auto-claimed (bossTrophy=true).
+- **Rebirth gate: BLOCKED at rebirth 9->10 when bossDefeated=false ("Defeat the Verdant Warden first!"), RELEASED when true.**
+- Base_1 trophy activated: TrophyActive=true, bust Material=Neon (glowing).
+
+## Passive trophy income (added 2026-06-23)
+- An active Warden trophy in a player's base earns gold over time, banked offline (capped), collected at the base trophy dome.
+- `GameData`: **TrophyIncomePerMin=5, TrophyOfflineCapHours=8, TrophyMaxBank=2400** (=5*60*8).
+- `ProfileService`: profile field `trophyLastCollect` (os.time, persisted). `ComputePendingIncome(plr)` = floor(elapsedMin * rate) clamped to TrophyMaxBank, only if bossTrophy. `CollectTrophyIncome(plr)` deposits pending + resets clock (drains bank) + returns amount. Clock starts when trophy first claimed (SetBossTrophy) and on Load if owned-but-unset (so offline time counts but not retroactively before first claim). Sync sends `trophyPending` + `trophyRatePerMin`.
+- `ServerScriptService.TrophyIncome` (NEW Script): adds a `CollectPrompt` ProximityPrompt to each `Base_i.Yard.Dome` (Dome.CanQuery=true; prompt enabled only when that base's owner has an active trophy, owner-only on trigger). Adds an `IncomeLabel` to the `Yard.TrophyTagAnchor` billboard showing "+N gold (press E)" / "earning 5/min" / "" live (3s refresh loop + OwnerUserId/TrophyActive change hooks). Handles `Remotes.CollectTrophy` + prompt.Triggered -> CollectTrophyIncome -> Toast.
+- Remote added: `CollectTrophy` (RemoteEvent).
+- NOTE: the prompt + IncomeLabel are created at RUNTIME by TrophyIncome and do NOT persist to edit mode (verified clean after play-stop).
+- **Verified in playtest:** 30min->150g; collect deposits exactly + resets to 0; 100hr capped at 2400; in-world label "+110 gold (press E)" with prompt enabled for the owner; real prompt collect 150->263 gold; no trophy -> prompt disabled + label empty + 0 pending.
+
+**Why:** Records where/how the Forest boss + gate + trophy reward + passive income were built so future sessions add a boss respawn/lockout, multiplayer boss balancing, and the Desert/Hell bosses (copy this arena+summon+gate+config pattern at their own far coords with their own gate level: Desert gate at 19, Hell at 29). The trophy-income system is biome-agnostic — new bosses that call `Profile.SetBossTrophy` + `BaseRegistry.SetBaseTrophy` get income for free.
+**How to apply:** Tune the boss via `ForestConfig.BOSS` + `GameData.Boss*`. Boss damage flows through the shared MobHit remote (filter `target==boss`). For the next biome's boss, set its `ForestBossGateLevel`-equivalent and reuse `Profile.SetBossDefeated`/the CanRebirth gate; reuse `BaseRegistry.SetBaseTrophy` for its trophy.

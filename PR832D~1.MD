@@ -1,0 +1,28 @@
+---
+name: project_hell_biome_build
+description: "Biome 3 \"The Inferno\" (Hell) — build state, economy tuning, and the sunken-location gotchas"
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: aab69254-d16c-4f92-a9e7-3e9ecd0b723c
+---
+
+Biome 3 = **"The Inferno"** (hell, dominant red), rebirth band **20→30**, built 2026-06-26. **SUNKEN realm at CENTER (0,-3000,0)** in `Workspace.HellRealm` (Structure/Camps/Flora/Boundary/Pads/Effects). Design doc at project root: `Biome3_Hell_Design.md`. Built + verified live (combat, chest, minimap, lighting, isolation).
+
+**Economy = exactly 2× the forest grind (≈4.56 hrs active reb20→30), the hardest biome.** Calibrated for **gear deferred / flat capped-Scepter DPS**, so HP growth is gentle (3.5%/level) to keep kills 5→7 hits instead of a slog.
+- Rebirth cost (biome-aware, local-reset): reb 20→21 = **1 of each hell crystal + 13,000 gold**, to 10 each + 130,000 at reb 29→30 (715,000 total). Gold = `local × 13,000`, set at the co-balance point (gold≈crystal demand).
+- Mob base (reb-20 floor): **HP 340, ATK 36, Armor 5**; HP +3.5%/L (→480), ATK +3.5%/L (→51).
+- Gold/kill = **6× forest** (216→270). Hell ≈ 169k gold/hr (vs desert 92k) — the clear farm. Biome ladder 1× / 2.5× / 6×.
+- Crystal drop **5%→7%** (base 5%, +0.2%/L), **pity 30**. 4 crystals: **MAGMA / BRIMSTONE / SOULFIRE / VOIDSTONE**.
+
+**Scripts/data (all biome-generalized — Hell is `GameData.Biomes[2]`):**
+- `ReplicatedStorage.HellConfig` (BIOME.Index=2, RebirthStart=20, CENTER (0,-3000,0)); `GameData` (4 hell crystals, `HellCrystalOrder`, `AllCrystalOrder`→12, `Biomes[2]`, `HellChest` GoldBase 900 / 3–5 crystals); `ProfileService.hellChestFoundSlot` (+Get/Set).
+- `ServerScriptService.HellMobs` (tag **"HellMob"**, biomeIdx 2, separate "HellPity"; no global regen). `HellChestSpawn` + `StarterPlayerScripts.HellTreasureChestClient` on remotes **HellTreasureState/HellOpenTreasure**. `HellMinimap`, `HellZoneLighting` (dark-red, FogEnd 440). `HubPortals` `Portal_HELL` gated reb≥20 → (0,-2992,70) + return pad. 4 weapon ClientAttack scripts now also target "HellMob".
+- Camps: Cinder Hollow (Emberling), Sulfur Pits (Gargling), Wailing Hollow (Wisp Wraith), Demon's Maw (Impling).
+
+**SUNKEN-LOCATION GOTCHAS (non-obvious; needed to make a deep biome work):**
+1. **`workspace.FallenPartsDestroyHeight` set to -3500** (was the default -500, which DESTROYED characters at y=-3000 → instant death/respawn on entry). This is the critical one.
+2. **`HubBounds` made Y-band aware**: surface fallers (-20..-2600) → hub; below -3200 → hell arrival; hell depths (-2600..-3200) left alone. (Original yanked anything <-20 back to hub, including hell players.)
+3. **`HellZoneLighting` + `HellMinimap` use a `y < -1500` guard** in their zone check, because hell's XZ (0,0) is within ZONE_R of the hub (750,0,0) — without it the hub would get hell lighting.
+
+**Deferred:** Hell gear ladder (weapons/shields — the planned reward of finishing this biome), Hell boss (gate reb 29→30?), per-camp stat flavour. Possible polish: lighting is quite dark (tune `HellConfig.LIGHTING` FogEnd/ClockTime/Brightness). See [[project_desert_biome_build]], [[project_forest_biome_build]], [[project_game_concept]], [[project_treasure_chest]].

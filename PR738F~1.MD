@@ -1,0 +1,60 @@
+---
+name: project-rebirth-shop-build
+description: "Rebirth + Shop progression loop built in Roblox Studio place v1 — tiered gear catalog, rebirth flow, hub kiosk/altar, base banner sync"
+metadata:
+  node_type: memory
+  type: project
+  originSessionId: rebirth-shop-session
+---
+
+# Rebirth + Shop — Build State (as of 2026-06-23)
+
+Core progression loop for the [[project-game-concept]] MMORPG. Ties together the [[project-forest-biome-build]] combat/inventory and the [[project-town-hub-build]] bases. Built in place "v1". Follows the concept doc exactly.
+
+## Design implemented
+- **Rebirth N cost** = N of EACH crystal (G/Y/B/R) + N×1000 gold. Crystals & gold are SACRIFICED on rebirth; rebirth level +1. MaxLevel=30 (3 biomes × 10). BiomeEvery=10.
+- **Shop** = tiered Forest gear catalog. Each item has `price` (gold) + `reqRebirth` (tier gate). Buying adds to owned gear; player equips via existing inventory panel. New-tier gear outscales old.
+
+## Data: `ReplicatedStorage.GameData` (extended)
+- Weapons (atk / price / reqRebirth): CandyCane 12/starter/0, **LollipopHammer 22/750/0**, **ChocolateBlade 38/3000/2**, **CrystalScepter 60/9000/5**. `WeaponOrder` lists them.
+- Shields (armor / price / reqRebirth): GummyShield 3/starter/0, **CookieGuard 8/600/0**, **HoneycombKite 16/2600/3**. `ShieldOrder` lists them.
+- Each item has `.color` (theme) + `.desc` + `.rarity` (Starter/Common/Rare/Epic).
+- `GameData.Rebirth` = {GoldPerLevel=1000, CrystalPerLevel=1, BiomeEvery=10, MaxLevel=30}.
+- `GameData.RebirthCost(targetLevel)` → {crystals={G/Y/B/R=N}, gold=N*1000}.
+
+## Server: `ServerScriptService.ProfileService` (extended)
+- Profile now has `rebirth` (int), persisted in Load/Save, synced + set as `Rebirth` player attribute.
+- `M.Sync` now also sends `rebirth` + `nextCost` (cost for level+1) to client.
+- New fns: `GetRebirth`, **BuyItem(plr,id)** (checks owned/tier/gold → adds gear, returns ok,reason), **CanRebirth(plr)** (checks crystals+gold for next level), **DoRebirth(plr)** (consumes cost, level+1, returns ok,reason,level).
+- NOTE (still true): requiring ProfileService from an MCP `execute_luau` gives a FRESH module copy (empty profiles). To test in the real game VM, inject a runtime `Script` into ServerScriptService (it shares the cached module); verify via player attributes/prints.
+
+## Server: `ServerScriptService.ShopRebirthService` (NEW Script)
+- Handles `Remotes.BuyItem` + `Remotes.RequestRebirth` → routes to ProfileService, fires `Toast` feedback (green/red/purple).
+- Updates the player's base `RebirthAnchor` rebirth-count BillboardGui label live on rebirth. Finds base by `OwnerUserId` then `OwnerName`. RebirthTag has 2 TextLabels: top="REBIRTH" caption, bottom=count (sort by Position.Y.Scale, take labels[2]).
+- No-ops safely if the player owns no base (base ownership assignment is still a separate TODO — see handoff).
+
+## Remotes added (`ReplicatedStorage.Remotes`)
+- `RequestRebirth` (RemoteEvent), `BuyItem` (RemoteEvent).
+
+## Client: `StarterPlayer.StarterPlayerScripts.ForestInventoryUI` (extended)
+- Bottom-left button STACK now: REBIRTH (R) / SHOP (P) / INVENTORY (I). Only one panel open at a time (`closeAll`).
+- **Shop panel**: scrolling catalog (ScrollingFrame + AutomaticCanvasSize=Enum.AutomaticSize.Y), per-item row with themed icon, stat, rarity, desc, and a BUY/OWNED/REBIRTH-N button reflecting live owned/tier/affordability state. Gold pill.
+- **Rebirth panel**: current level badge, 4-crystal cost grid (have/need, green/red), gold cost row, confirm button that disables ("NOT ENOUGH MATERIALS") until affordable.
+- `onSync` caches `lastSync` and refreshes open panels. Forward-declared `refreshShop`/`refreshRebirth`.
+- HUD exposes `OpenPanel` BindableEvent (child of ForestHUD ScreenGui) so world prompts can open panels.
+
+## Client: `StarterPlayer.StarterPlayerScripts.HubServicePrompts` (NEW LocalScript)
+- Listens to `ProximityPromptService.PromptTriggered`; if pad name == "ShopPad" → open Shop, "RebirthPad" → open Rebirth (fires the HUD `OpenPanel` BindableEvent, no server hop).
+
+## World: `Workspace.TownHub.Services` (NEW Folder)
+- **ShopKiosk** @ (700, *, -34): wooden market stall, candy-striped awning, "CANDY SHOP" SurfaceGui sign, jar/lollipop props, `ShopPad` (gold Neon) with ProximityPrompt (E, "Browse").
+- **RebirthAltar** @ (750, *, 26) at monument foot: 3 stacked slate discs, pedestal, floating purple Neon gem (+PointLight) ringed by 4 rebirth-colored shards, "REBIRTH ALTAR" BillboardGui, `RebirthPad` (purple Neon) with ProximityPrompt (E, "Rebirth").
+
+## Verified in playtest (2026-06-23)
+- Rebirth cost scaling correct (1000 then 2000 consumed for L1→L2); crystals+gold sacrificed exactly; level incremented.
+- Shop: bought LollipopHammer + ChocolateBlade (gold deducted 750+3000); CrystalScepter correctly rejected "Requires Rebirth 5"; OWNED state shows.
+- Base banner updates to rebirth level when a base is assigned to the player (OwnerUserId/OwnerName).
+- Both UI panels render correctly; kiosk + altar styled and in place.
+
+**Why:** Records the full rebirth/shop economy so future sessions add the Forest BOSS (gates rebirth progression per concept), base-ownership assignment (so banners/plaques bind to real players), passive trophy income, and Desert/Hell shop tiers.
+**How to apply:** Extend the catalog in `GameData.Weapons/Shields` (+WeaponOrder/ShieldOrder) and rebirth math in `GameData.Rebirth`/`RebirthCost`. All purchase/rebirth validation lives in ProfileService; ShopRebirthService is just routing + banner sync. Add Desert/Hell gear as higher reqRebirth tiers (10+, 20+).

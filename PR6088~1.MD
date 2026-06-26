@@ -1,0 +1,37 @@
+---
+name: project-combat-inventory-build
+description: "Forest combat/inventory/economy systems in Roblox place v1 — weapon Tool, drops, gold, regen, fixes from 2026-06-21 bug pass"
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: a3b98850-459c-45e2-8708-065808e1161c
+---
+
+# Combat / Inventory / Economy — Build State (as of 2026-06-21)
+
+Core gameplay loop for the [[project-game-concept]] MMORPG, layered onto the [[project-forest-biome-build]] Forest. Server-authoritative. Built in place "v1".
+
+## Scripts & data (the system)
+- `ReplicatedStorage.GameData` (ModuleScript) — central constants: DropChance=0.05, RespawnTime=30, MaxPerCamp=6, PlayerBaseHP=100, **ForestGoldPerKill=15**, RegenInCombat=1, RegenOutCombat=10, CombatTimeout=15, PickupLifetime=60. Holds Crystals table, Weapons table (LollipopHammer = starter, attackPower 12), StarterWeapon.
+- `ServerScriptService.ProfileService` (ModuleScript) — per-player profile: crystals, weapons, equippedWeapon, **gold**. Functions: Get/Load/Save/Sync/ComputeStats, AddCrystal, **AddGold/GetGold**, EquipWeapon. ComputeStats sets player attrs AttackPower/Armor purely from equipped gear (player has NO base stats). Sets `Gold` attr. DataStore "ForestProfileV1" (best-effort; Studio API-access warning is harmless).
+- `ServerScriptService.PlayerInit` (Script) — on spawn: MaxHealth/Health=100; **destroys Roblox's built-in `Health` regen script** (the 1%/sec one) so our regen is exact; gives + auto-equips the weapon Tool by cloning from `ServerStorage.Weapons` (re-given every respawn). Handles EquipItem remote.
+- `ServerScriptService.ForestMobs` (Script) — mob combat: health bars, MobHit remote (client click → server damage, 20-stud reach, 0.28s rate-limit), retaliation (mobs bonk players <13 studs, 1.4s cadence), death → **always +15 gold to killer**, 5% → spawns a floor crystal pickup, 30s respawn (same mob, cap stays 6). **Combat-aware HP regen loop** (0.5s tick): sets/reads player attr `LastCombat`; <15s since last fight = 1 hp/s, else 10 hp/s.
+- `ServerStorage.Weapons["Lollipop Hammer"]` (Tool) — the starter weapon MODEL (was missing — root cause of "can't equip/attack"). Handle (cream stick) + CandyHead (pink ball) + 2 white Swirls + blue Stripe + `Bonk` Sound (rbxassetid://9116684884, verified). Grip=(0,-1.6,0). Contains `ClientAttack` (LocalScript): on Activated, fires MobHit at slime under mouse or nearest in reach, plays swing anim + bonk.
+- `StarterPlayer.StarterPlayerScripts.ForestInventoryUI` (LocalScript) — HUD: HP bar, ATK/DEF, **Gold pill (top)**, BAG (B) → backpack with crystals grid + gear (click to equip). Reads InventorySync.
+- `ReplicatedStorage.Remotes`: MobHit, InventorySync, EquipItem, Toast.
+
+## 2026-06-21 bug-fix pass (verified in playtest)
+1. **Can't equip/attack** → root cause: the Lollipop Hammer was only DATA, never an actual Tool; nothing fired MobHit. Built the Tool in ServerStorage + ClientAttack script + PlayerInit gives/equips it. Verified: held on spawn & respawn, ATK 12, hits register.
+2. **Mobs one-shot player** → set Forest mob AttackPower 8→**15** (ForestConfig MOB_STATS, GameData live attrs, all 24 mobs). Added regen so it's survivable. Verified: in-combat 1.0 hp/s, out-of-combat 10.0 hp/s (after disabling default Health script — it stacked +1%/sec).
+3. **Crystal drops** → now spawn as a physical neon gem on the floor (bob+spin+sparkle+label) at the death spot; any player walks over to collect (Touched → AddCrystal + Toast); despawn 60s. Verified drop+pickup end-to-end (tested at 100% chance, restored to 5%).
+4. **Gold currency** → added; **15 gold per Forest mob kill** (always). Persists, syncs, shown in HUD. Verified gold +15/kill.
+
+## Notes / gotchas
+- `execute_luau` runs each call in a fresh VM BUT ModuleScripts are cached & shared with running scripts (same-table edits to GameData persist live; reset on play stop).
+- `FireServer` only works from Client datamodel, not Server.
+- Default Roblox `Health` character script regenerates 1%/sec — destroyed in PlayerInit so our rates are exact.
+- Mob count holds at exactly 6/camp (respawn replaces the same instance; never spawns new ones).
+- Bonk/any audio: verify SoundId via insert_asset before use — guessed IDs (9116392951, 7314943785) were NOT valid sounds; 9116684884 (ProSoundEffects Metal Impacts 5) works.
+
+**Why:** Records the combat/inventory/economy systems and the 2026-06-21 fixes so future sessions build the shop, rebirth flow, more weapons/armor, and Desert/Hell combat on the same foundation.
+**How to apply:** Add new weapons/armor to `GameData.Weapons` (+ build a Tool model in ServerStorage.Weapons for anything equippable). Gear is the only stat source. Reuse ProfileService for currency/inventory; reuse the floor-pickup pattern for new drops; per-biome gold via a GoldPerKill-style constant.

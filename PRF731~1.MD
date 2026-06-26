@@ -1,0 +1,33 @@
+---
+name: project_desert_biome_build
+description: "Biome 2 \"The Gilded Wastes\" (desert) — build state, economy tuning, and integration points"
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: aab69254-d16c-4f92-a9e7-3e9ecd0b723c
+---
+
+Biome 2 = **"The Gilded Wastes"** (desert, sand-yellow), rebirth band **10→20**, built 2026-06-26. World at isolated CENTER **(7000,0,0)** in `Workspace.GildedWastes` (Structure/Camps/Flora/Boundary/Pads/Effects), mirroring `Workspace.ForestBiome`. Design doc saved at project root: `Biome2_Desert_Design.md`.
+
+**Economy (tuned to ~1.5× the forest grind; forest reb0→10 ≈ 2.3h active, desert reb10→20 ≈ 3.4–4.0h active):**
+- Rebirth cost is **biome-aware + local-reset**: reb 10→11 = **1 of each desert crystal + 4,500 gold**, scaling to 10 each + 45,000 at reb 19→20. Gold = `local_level × 4,500`. Crystal count unchanged from forest (1..10 each = 55 total per type).
+- Mob base (reb-10 floor): **HP 180, ATK 24, Armor 3**; HP +6%/level, ATK +3%/level over the band (HP 180→322, ATK 24→32). Gentler HP growth than forest (10%) because player DPS is flat reb 10–20 (no new weapons until Biome 3).
+- Gold/kill = **2.5× forest** (`Biomes[1].goldMult`) → 62 at reb10 → 87–88 at reb20. Makes desert the clear farm (+~73%/hr vs back-farming forest).
+- Crystal drop **4% → 6.5%** (base 4%, +0.25%/level), **pity 30**. 4 new crystals: **CITRINE / CARNELIAN / TURQUOISE / AMETHYST**.
+
+**Code integration (the source of truth is `GameData.Biomes`):**
+- `GameData`: added desert crystals (Crystals + `DesertCrystalOrder` + `AllCrystalOrder`), `Biomes[0/1]` metadata, `BiomeForLevel`, biome-aware `RebirthCost`, `BiomeMobHP/BiomeMobDamage/BiomeDropChance/BiomeGoldPerKill/BiomePity`, `DesertChest`. Forest output is unchanged (verified).
+- `ReplicatedStorage.DesertConfig`: world/camp/mob/lighting source of truth (mirrors ForestConfig; BIOME.Index=1, RebirthStart=10).
+- `ProfileService.defaultProfile` now iterates `AllCrystalOrder` (8 slots); rebirth consume logic was already generic.
+- `ServerScriptService.DesertMobs`: combat (copy of ForestMobs; tag **"DesertMob"**, biome funcs idx=1, separate "DesertPity"; NO global regen loop — that stays in ForestMobs).
+- `HubPortals`: `Portal_DESERT` gated at **rebirth ≥ 10** → teleport to (7000,8,70); desert return pad wired.
+- `DesertZoneLighting` (StarterPlayerScripts): warm atmosphere + `DesertCC` inside ZONE_R, restores hub default on exit.
+- All 4 weapon `ClientAttack` scripts patched to also target "DesertMob".
+- `ForestInventoryUI`: bag crystal grid + rebirth cost grid rebuild per biome band via `BiomeForLevel(rebirth+1).crystalOrder`.
+
+**Treasure chest + minimap (built 2026-06-26):**
+- `ServerScriptService.DesertChestSpawn` + `StarterPlayerScripts.DesertTreasureChestClient` — desert copy of ChestSpawn/TreasureChestClient on **separate remotes** `DesertTreasureState`/`DesertOpenTreasure` and a **separate profile field** `desertChestFoundSlot` (so the two biome chests are independent). Loot from `GameData.DesertChest` (gold 375×(1+rb), 2–4 random desert crystals, gold/luck buff). Gold beacon + warn banner. Chest raycast **excludes `workspace.GildedWastes`** so it lands on sand (not on the arch).
+- `StarterPlayerScripts.DesertMinimap` — sandy minimap (title "GILDED WASTES", 4 camp markers labeled CI/CA/TU/AM + paths + oasis + player arrow), shown only inside the desert ZONE_R.
+- Verified live: chest spawns on ground, renders, opens (distance-validated) and closes; minimap renders; no errors.
+
+**Still deferred:** optional **per-camp stat flavor** (hpMult/dmgMult fields exist in DesertConfig, set to 1.0), **desert boss** (TBD, may gate 19→20), visual confirm of the desert crystal UI at reb 10, and interim mid-biome weapon/shield (intentionally after Biome 3 per user). See [[project_game_concept]], [[project_forest_biome_build]], [[project_balance_system]], [[project_treasure_chest]].
