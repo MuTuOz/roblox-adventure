@@ -1,0 +1,19 @@
+---
+name: project-weapon-swap-fix
+description: Fix for weapon model not updating in hand when equipping a different weapon (2026-06-23)
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: c060dd4f-04a4-4c97-bdb4-635eb46c64e1
+---
+
+Bug (fixed 2026-06-23): equipping a different weapon updated stats/UI but the model in the player's hand didn't change until respawn.
+
+Root cause: server `ProfileService.EquipWeapon` only updated `equippedWeapon` + stats + Sync; it never rebuilt the held Tool. `PlayerInit.giveWeapon` only ran at character spawn.
+
+Fix (in `ServerScriptService.PlayerInit`):
+- Added `WEAPON_NAMES` table (all weapon template names) + `clearWeaponTools(plr,char)` that destroys ANY weapon Tool in Backpack or Character (old version only removed a Tool matching the NEW name, leaving the old weapon behind).
+- `giveWeapon(plr, char, equipNow)` gained `equipNow`: on a live swap it parents the clone to Backpack then `hum:EquipTool(clone)` so the held model updates instantly.
+- `EquipItem.OnServerEvent` handler now calls `giveWeapon(plr, char, true)` right after `Profile.EquipWeapon`.
+
+Caveat: model rebuild only triggers via the `EquipItem` remote (the bag UI path). Calling `Profile.EquipWeapon` directly elsewhere will NOT swap the model. Related: [[project_combat_inventory_build]], [[project_rebirth_shop_build]].

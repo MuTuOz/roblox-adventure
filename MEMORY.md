@@ -1,3 +1,5 @@
+# Memory Index
+
 - [Game Concept](project_game_concept.md) — Core MMORPG design: biomes, rebirth, bases, PvP duels, 8-player shared world, target audience 8–13
 - [Developer Handoff](project_handoff.md) — Self-contained handoff doc: full game design + current Studio build state as of 2026-06-21
 - [Town Hub Build](project_town_hub_build.md) — Hub prototype in Studio at (750,0,0): plaza, crystal monument, 4 portals, 8 bases, conventions; Pass 4: BaseOwnership + BaseRegistry auto-assign
@@ -15,3 +17,6 @@
 - [Inventory UI Icons](project_inventory_ui_icons.md) — HUD gold pill moved top-center; BAG/SHOP gear icons now stylized vector mini-pictures per item (makeItemIcon)
 - [Chest Steal](project_chest_steal.md) — Base chest item storage (weapons/shields persist), inspect other players' inventories, 500-Robux steal of most valuable item; 2026-06-24
 - [Wheel of Fortune](project_wheel_of_fortune.md) — Daily-spin wheel at Town Hub: 8 rarity-weighted prizes (gold/crystal/gear), 24h cooldown, server-authoritative; WheelService + WheelUI; 2026-06-26
+- [Desert Biome Build](project_desert_biome_build.md) — Biome 2 "The Gilded Wastes" (reb 10→20) at (7000,0,0): 4 desert crystal camps, DesertMobs, reb-10 portal gate, warm zone lighting, biome-aware economy. Built+verified 2026-06-26
+- [Hell Biome Build](project_hell_biome_build.md) — Biome 3 "The Inferno" (reb 20→30), SUNKEN at (0,-3000,0): 4 hell crystal camps, reb-20 portal, dark-red zone lighting. Built+verified 2026-06-26
+- [Treasure Chest](project_treasure_chest.md) — Timed forest world-event chest: real-time 3h slots, seeded random location, client-rendered, find-to-open, weighted loot
